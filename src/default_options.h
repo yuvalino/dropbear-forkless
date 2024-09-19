@@ -363,4 +363,7 @@ be overridden at runtime with -I. 0 disables idle timeouts */
 #define DEFAULT_PATH "/usr/bin:/bin"
 #define DEFAULT_ROOT_PATH "/usr/sbin:/usr/bin:/sbin:/bin"
 
+/* Optional embedded hostkey instead of using a file */
+#define DROPBEAR_EMBEDDED_HOSTKEY ""
+
 #endif /* DROPBEAR_DEFAULT_OPTIONS_H_ */

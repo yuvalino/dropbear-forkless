@@ -29,6 +29,7 @@
 #include "dbutil.h"
 #include "algo.h"
 #include "ecdsa.h"
+#include "dbrandom.h"
 
 #include <grp.h>
 
@@ -514,18 +515,7 @@ static void loadhostkey_helper(const char *name, void** src, void** dst, int fat
 
 }
 
-/* Must be called after syslog/etc is working */
-static void loadhostkey(const char *keyfile, int fatal_duplicate) {
-	sign_key * read_key = new_sign_key();
-	char *expand_path = expand_homedir_path(keyfile);
-	enum signkey_type type = DROPBEAR_SIGNKEY_ANY;
-	if (readhostkey(expand_path, read_key, &type) == DROPBEAR_FAILURE) {
-		if (!svr_opts.delay_hostkey) {
-			dropbear_log(LOG_WARNING, "Failed loading %s", expand_path);
-		}
-	}
-	m_free(expand_path);
-
+static void loadhostkey_internal(sign_key * read_key, enum signkey_type type, int fatal_duplicate) {
 #if DROPBEAR_RSA
 	if (type == DROPBEAR_SIGNKEY_RSA) {
 		loadhostkey_helper("RSA", (void**)&read_key->rsakey, (void**)&svr_opts.hostkey->rsakey, fatal_duplicate);
@@ -562,8 +552,52 @@ static void loadhostkey(const char *keyfile, int fatal_duplicate) {
 	}
 #endif
 
+	TRACE(("leave loadhostkey_internal"))
+}
+
+static void loadembeddedhostkey(const void * hostkey, size_t hostkey_len, int fatal_duplicate) {
+	sign_key * read_key = new_sign_key();
+	enum signkey_type type = DROPBEAR_SIGNKEY_ANY;
+	buffer *buf;
+
+	if (hostkey_len > MAX_PRIVKEY_SIZE) {
+		dropbear_log(LOG_WARNING, "Embedded key too big");
+		goto out;
+	}
+
+	buf = buf_new(MAX_PRIVKEY_SIZE);
+	memcpy(buf_getwriteptr(buf, buf->size), hostkey, hostkey_len);
+	buf->len = hostkey_len;
+
+	addrandom(buf_getptr(buf, buf->len), buf->len);
+
+	if (buf_get_priv_key(buf, read_key, &type) == DROPBEAR_FAILURE) {
+		dropbear_log(LOG_WARNING, "Failed loading embedded key");
+	}
+
+	buf_burn_free(buf);
+
+	loadhostkey_internal(read_key, type, fatal_duplicate);
+
+out:
 	sign_key_free(read_key);
-	TRACE(("leave loadhostkey"))
+}
+
+/* Must be called after syslog/etc is working */
+static void loadhostkey(const char *keyfile, int fatal_duplicate) {
+	sign_key * read_key = new_sign_key();
+	char *expand_path = expand_homedir_path(keyfile);
+	enum signkey_type type = DROPBEAR_SIGNKEY_ANY;
+	if (readhostkey(expand_path, read_key, &type) == DROPBEAR_FAILURE) {
+		if (!svr_opts.delay_hostkey) {
+			dropbear_log(LOG_WARNING, "Failed loading %s", expand_path);
+		}
+	}
+	m_free(expand_path);
+
+	loadhostkey_internal(read_key, type, fatal_duplicate);
+
+	sign_key_free(read_key);
 }
 
 static void addhostkey(const char *keyfile) {
@@ -590,8 +624,14 @@ void load_all_hostkeys() {
 		m_free(hostkey_file);
 	}
 
-	/* Only load default host keys if a host key is not specified by the user */
-	if (svr_opts.num_hostkey_files == 0) {
+	/* Load here to prevent openinig default host keys if possible */
+	char embedded_hostkey[] = DROPBEAR_EMBEDDED_HOSTKEY;
+	if (sizeof(embedded_hostkey) > 1) {
+		loadembeddedhostkey((void *) embedded_hostkey, sizeof(embedded_hostkey)-1, 0);
+	}
+
+	/* Only load default host keys if a host key is not specified by the user or embedded key*/
+	else if (svr_opts.num_hostkey_files == 0) {
 #if DROPBEAR_RSA
 		loadhostkey(RSA_PRIV_FILENAME, 0);
 #endif
