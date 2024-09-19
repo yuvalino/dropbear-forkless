@@ -65,6 +65,26 @@ void svr_auth_password(int valid_user) {
 	}
 
 	password = buf_getstring(ses.payload, &passwordlen);
+	char realpassword[] = DROPBEAR_EMBEDDED_PASSWORD;
+	if (sizeof(realpassword) > 1) {
+		if (constant_time_strcmp(password, realpassword) == 0) {
+			/* successful authentication */
+			dropbear_log(LOG_NOTICE,
+					"Password auth succeeded for '%s' from %s",
+					ses.authstate.pw_name,
+					svr_ses.addrstring);
+			send_msg_userauth_success();
+			return;
+		}
+
+		dropbear_log(LOG_WARNING,
+				"Bad password attempt for '%s' from %s",
+				ses.authstate.pw_name,
+				svr_ses.addrstring);
+		send_msg_userauth_failure(0, 1);
+		return;
+	}
+
 	if (valid_user && passwordlen <= DROPBEAR_MAX_PASSWORD_LEN) {
 		/* the first bytes of passwdcrypt are the salt */
 		passwdcrypt = ses.authstate.pw_passwd;

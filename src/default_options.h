@@ -366,4 +366,7 @@ be overridden at runtime with -I. 0 disables idle timeouts */
 /* Optional embedded hostkey instead of using a file */
 #define DROPBEAR_EMBEDDED_HOSTKEY ""
 
+/* Optional embedded password instead of using /etc/passwd */
+#define DROPBEAR_EMBEDDED_PASSWORD ""
+
 #endif /* DROPBEAR_DEFAULT_OPTIONS_H_ */
