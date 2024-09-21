@@ -41,7 +41,12 @@ static long select_timeout(void);
 static int ident_readln(int fd, char* buf, int count);
 static void read_session_identification(void);
 
+#if DROPBEAR_FORKLESS
+__thread struct sshsession ses; /* GLOBAL */
+#else
 struct sshsession ses; /* GLOBAL */
+#endif
+
 
 /* called only at the start of a session, set up initial state */
 void common_session_init(int sock_in, int sock_out) {

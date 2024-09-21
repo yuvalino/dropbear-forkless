@@ -339,10 +339,18 @@ struct clientsession {
 };
 
 /* Global structs storing the state */
+#if DROPBEAR_FORKLESS
+extern __thread struct sshsession ses;
+#else
 extern struct sshsession ses;
+#endif
 
 #if DROPBEAR_SERVER
+#if DROPBEAR_FORKLESS
+extern __thread struct serversession svr_ses;
+#else
 extern struct serversession svr_ses;
+#endif
 #endif /* DROPBEAR_SERVER */
 
 #if DROPBEAR_CLIENT

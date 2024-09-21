@@ -23,6 +23,11 @@
  * SOFTWARE. */
 
 #include "includes.h"
+
+#if DROPBEAR_FORKLESS
+#include <pthread.h>
+#endif
+
 #include "dbutil.h"
 #include "session.h"
 #include "buffer.h"
@@ -35,7 +40,9 @@ static size_t listensockets(int *sock, size_t sockcount, int *maxfd);
 static void sigchld_handler(int dummy);
 static void sigsegv_handler(int);
 static void sigintterm_handler(int fish);
+#if INETD_MODE || DROPBEAR_DO_REEXEC
 static void main_inetd(void);
+#endif
 static void main_noinetd(int argc, char ** argv, const char* multipath);
 static void commonsetup(void);
 
@@ -123,6 +130,22 @@ static void main_inetd() {
 #endif /* INETD_MODE */
 
 #if NON_INETD_MODE
+struct child_args {
+	int sock;
+	int childpipe;
+};
+
+static void *child_noinetd(void *arg)
+{
+	struct child_args cargs = *((struct child_args *)arg);
+	m_free(arg);
+
+	/* start the session */
+	svr_session(cargs.sock, cargs.childpipe);
+	/* don't return */
+	dropbear_assert(0);
+}
+
 static void main_noinetd(int argc, char ** argv, const char* multipath) {
 	fd_set fds;
 	unsigned int i, j;
@@ -260,6 +283,7 @@ static void main_noinetd(int argc, char ** argv, const char* multipath) {
 			size_t conn_idx = 0;
 			struct sockaddr_storage remoteaddr;
 			socklen_t remoteaddrlen;
+			int noclose = 0;
 
 			if (!FD_ISSET(listensocks[i], &fds)) 
 				continue;
@@ -302,31 +326,51 @@ static void main_noinetd(int argc, char ** argv, const char* multipath) {
 				goto out;
 			}
 
+			getaddrstring(&remoteaddr, NULL, &remote_port, 0);
+			dropbear_log(LOG_INFO, "Child connection from %s:%s", remote_host, remote_port);
+
 #if DEBUG_NOFORK
 			fork_ret = 0;
+#elif DROPBEAR_FORKLESS
+			pthread_t tid;
+			pthread_attr_t attr;
+			struct child_args *cargs = NULL;
+
+			fork_ret = pthread_attr_init(&attr);
+			if (fork_ret != 0) {
+				dropbear_log(LOG_WARNING, "Error initializing pthread attr: %s", strerror(fork_ret));
+				goto out;
+			}
+			fork_ret = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+			if (fork_ret != 0) {
+				dropbear_log(LOG_WARNING, "Error setting detach state: %s", strerror(fork_ret));
+				pthread_attr_destroy(&attr);
+				goto out;
+			}
+
+			cargs = m_malloc(sizeof(struct child_args));
+			cargs->sock = childsock;
+			cargs->childpipe = childpipe[1];
+
+			fork_ret = pthread_create(&tid, &attr, child_noinetd, (void *)cargs);
+			if (fork_ret != 0) {
+				dropbear_log(LOG_WARNING, "Error creating pthread: %s", strerror(fork_ret));
+				m_free(cargs);
+				pthread_attr_destroy(&attr);
+				goto out;
+			}
+			(void)execfd;
+			pthread_attr_destroy(&attr);
 #else
 			fork_ret = fork();
-#endif
 			if (fork_ret < 0) {
 				dropbear_log(LOG_WARNING, "Error forking: %s", strerror(errno));
 				goto out;
 			}
 
-			addrandom((void*)&fork_ret, sizeof(fork_ret));
+			if (fork_ret == 0) {
+				addrandom((void*)&fork_ret, sizeof(fork_ret));
 
-			if (fork_ret > 0) {
-
-				/* parent */
-				childpipes[conn_idx] = childpipe[0];
-				m_close(childpipe[1]);
-				preauth_addrs[conn_idx] = remote_host;
-				remote_host = NULL;
-
-			} else {
-
-				/* child */
-				getaddrstring(&remoteaddr, NULL, &remote_port, 0);
-				dropbear_log(LOG_INFO, "Child connection from %s:%s", remote_host, remote_port);
 				m_free(remote_host);
 				m_free(remote_port);
 
@@ -374,7 +418,7 @@ static void main_noinetd(int argc, char ** argv, const char* multipath) {
 					/* Not reached on success */
 
 					/* Fall back on plain fork otherwise.
-					 * To be removed in future once re-exec has been well tested */
+						* To be removed in future once re-exec has been well tested */
 					dropbear_log(LOG_WARNING, "fexecve failed, disabling re-exec: %s", strerror(errno));
 					m_close(STDIN_FILENO);
 					m_free(new_argv);
@@ -386,10 +430,24 @@ static void main_noinetd(int argc, char ** argv, const char* multipath) {
 				/* don't return */
 				dropbear_assert(0);
 			}
+#endif
+
+			addrandom((void*)&fork_ret, sizeof(fork_ret));
+
+			/* parent */
+			childpipes[conn_idx] = childpipe[0];
+		
+#if !DROPBEAR_FORKLESS
+			m_close(childpipe[1]);
+#endif
+			preauth_addrs[conn_idx] = remote_host;
+			remote_host = NULL;
 
 out:
 			/* This section is important for the parent too */
-			m_close(childsock);
+			if (noclose) {
+				m_close(childsock);
+			}
 			if (remote_host) {
 				m_free(remote_host);
 			}

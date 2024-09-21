@@ -23,6 +23,11 @@
  * SOFTWARE. */
 
 #include "includes.h"
+
+#if DROPBEAR_FORKLESS
+#include <pthread.h>
+#endif
+
 #include "session.h"
 #include "dbutil.h"
 #include "packet.h"
@@ -45,7 +50,11 @@
 static void svr_remoteclosed(void);
 static void svr_algos_initialise(void);
 
+#if DROPBEAR_FORKLESS
+__thread struct serversession svr_ses; /* GLOBAL */
+#else
 struct serversession svr_ses; /* GLOBAL */
+#endif
 
 static const packettype svr_packettypes[] = {
 	{SSH_MSG_CHANNEL_DATA, recv_msg_channel_data},
@@ -296,6 +305,10 @@ void svr_dropbear_exit(int exitcode, const char* format, va_list param) {
     }
 #endif
 
+#if DROPBEAR_FORKLESS
+	(void)i;
+	pthread_exit((void *)(long)exitcode);
+#else
 	if (svr_opts.hostkey) {
 		sign_key_free(svr_opts.hostkey);
 		svr_opts.hostkey = NULL;
@@ -305,9 +318,8 @@ void svr_dropbear_exit(int exitcode, const char* format, va_list param) {
 		m_free(svr_opts.ports[i]);
 	}
 
-    
 	exit(exitcode);
-
+#endif
 }
 
 /* priority is priority as with syslog() */
