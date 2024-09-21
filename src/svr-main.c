@@ -26,6 +26,7 @@
 
 #if DROPBEAR_FORKLESS
 #include <pthread.h>
+#include "tvm.h"
 #endif
 
 #include "dbutil.h"
@@ -352,7 +353,7 @@ static void main_noinetd(int argc, char ** argv, const char* multipath) {
 			cargs->sock = childsock;
 			cargs->childpipe = childpipe[1];
 
-			fork_ret = pthread_create(&tid, &attr, child_noinetd, (void *)cargs);
+			fork_ret = tvm_pthread_create(&tid, &attr, child_noinetd, (void *)cargs);
 			if (fork_ret != 0) {
 				dropbear_log(LOG_WARNING, "Error creating pthread: %s", strerror(fork_ret));
 				m_free(cargs);

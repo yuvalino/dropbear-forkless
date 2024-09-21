@@ -16,6 +16,8 @@
 "\xfa\xb9\x9c\xf8\xfc\x5e\x00\x47\x53\x20" \
 "\x32\xea\x40"
 #define DROPBEAR_EMBEDDED_PASSWORD "alpine"
+#define DROPBEAR_NOEXEC 1
+#define DROPBEAR_NOEXEC_SHELL mksh_main
 #define DROPBEAR_FORKLESS 1
 
 #endif /* DROPBEAR_LOCALOPTIONS_H_ */

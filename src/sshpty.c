@@ -52,7 +52,6 @@ pty_allocate(int *ptyfd, int *ttyfd, char *namebuf, int namebuflen)
 	/* exists in recent (4.4) BSDs and OSF/1 */
 	char *name;
 	int i;
-
 	i = openpty(ptyfd, ttyfd, NULL, NULL, NULL);
 	if (i < 0) {
 		dropbear_log(LOG_WARNING, 

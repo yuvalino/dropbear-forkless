@@ -31,7 +31,7 @@
 
 struct exitinfo {
 
-	int exitpid; /* -1 if not exited */
+	_ptid_t exitpid; /* -1 if not exited */
 	int exitstatus;
 	int exitsignal;
 	int exitcore;
@@ -40,7 +40,7 @@ struct exitinfo {
 struct ChanSess {
 
 	char * cmd; /* command to exec */
-	pid_t pid; /* child process pid */
+	_ptid_t pid; /* child process pid */
 	/* command that was sent by the client, if authorized_keys command= or
 	dropbear -c was used */
 	char *original_command;
@@ -78,7 +78,7 @@ struct ChanSess {
 };
 
 struct ChildPid {
-	pid_t pid;
+	_ptid_t pid;
 	struct ChanSess * chansess;
 };
 

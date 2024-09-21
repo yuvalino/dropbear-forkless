@@ -61,7 +61,7 @@ extern int debug_trace;
 char * stripcontrol(const char * text);
 
 int spawn_command(void(*exec_fn)(const void *user_data), const void *exec_data,
-		int *writefd, int *readfd, int *errfd, pid_t *pid);
+		int *writefd, int *readfd, int *errfd, _ptid_t *pid);
 void run_shell_command(const char* cmd, unsigned int maxfd, char* usershell);
 #if ENABLE_CONNECT_UNIX
 int connect_unix(const char* addr);

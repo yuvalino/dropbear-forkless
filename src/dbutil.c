@@ -67,6 +67,10 @@
 #include "session.h"
 #include "atomicio.h"
 
+#if DROPBEAR_FORKLESS
+#include "tvm.h"
+#endif
+
 #define MAX_FMT 100
 
 static void generic_dropbear_exit(int exitcode, const char* format, 
@@ -266,17 +270,57 @@ int connect_unix(const char* path) {
 }
 #endif
 
+static void *spawn_command_child(int infd, int outfd, int errfd, void(*exec_fn)(const void *user_data), const void *exec_data)
+{
+	/* redirect stdin/stdout */
+
+	if ((dup2(infd, STDIN_FILENO) < 0) ||
+		(dup2(outfd, STDOUT_FILENO) < 0) ||
+		((errfd != -1) && dup2(errfd, STDERR_FILENO) < 0)) {
+		TRACE(("leave noptycommand: error redirecting FDs"))
+		dropbear_exit("Child dup2() failure");
+	}
+
+	close(infd);
+	close(outfd);
+	if (errfd != -1)
+		close(errfd);
+
+	/* start the session */
+	exec_fn(exec_data);
+	/* don't return */
+	dropbear_assert(0);
+}
+
+struct child_args
+{
+	int infd;
+	int outfd;
+	int errfd;
+	void(*exec_fn)(const void *user_data);
+	const void *exec_data;
+};
+
+static void *spawn_command_thread(void *arg)
+{
+	struct child_args carg = *((struct child_args *) arg);
+	m_free(arg);
+
+	spawn_command_child(carg.infd, carg.outfd, carg.errfd, carg.exec_fn, carg.exec_data);
+	dropbear_assert(0);
+}
+
 /* Sets up a pipe for a, returning three non-blocking file descriptors
  * and the pid. exec_fn is the function that will actually execute the child process,
  * it will be run after the child has fork()ed, and is passed exec_data.
  * If ret_errfd == NULL then stderr will not be captured.
  * ret_pid can be passed as  NULL to discard the pid. */
 int spawn_command(void(*exec_fn)(const void *user_data), const void *exec_data,
-		int *ret_writefd, int *ret_readfd, int *ret_errfd, pid_t *ret_pid) {
+		int *ret_writefd, int *ret_readfd, int *ret_errfd, _ptid_t *ret_pid) {
 	int infds[2];
 	int outfds[2];
 	int errfds[2];
-	pid_t pid;
+	_ptid_t pid;
 
 	const int FDIN = 0;
 	const int FDOUT = 1;
@@ -292,18 +336,78 @@ int spawn_command(void(*exec_fn)(const void *user_data), const void *exec_data,
 		return DROPBEAR_FAILURE;
 	}
 	if (pipe(outfds) != 0) {
+		close(infds[0]);
+		close(infds[1]);
 		return DROPBEAR_FAILURE;
 	}
 	if (ret_errfd && pipe(errfds) != 0) {
+		close(infds[0]);
+		close(infds[1]);
+		close(outfds[0]);
+		close(outfds[1]);
 		return DROPBEAR_FAILURE;
 	}
 
+#if DROPBEAR_FORKLESS
+
+	pthread_attr_t attr;
+	struct child_args *cargs = NULL;
+
+	int ret = pthread_attr_init(&attr);
+	if (ret != 0)
+	{
+		close(infds[0]);
+		close(infds[1]);
+		close(outfds[0]);
+		close(outfds[1]);
+		if (ret_errfd) {
+			close(errfds[0]);
+			close(errfds[1]);
+		}
+		return DROPBEAR_FAILURE;
+	}
+	ret = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	if (ret != 0) {
+		close(infds[0]);
+		close(infds[1]);
+		close(outfds[0]);
+		close(outfds[1]);
+		if (ret_errfd) {
+			close(errfds[0]);
+			close(errfds[1]);
+		}
+		pthread_attr_destroy(&attr);
+		return DROPBEAR_FAILURE;
+	}
+
+	cargs = m_malloc(sizeof(struct child_args));
+	cargs->infd = infds[FDIN];
+	cargs->outfd = outfds[FDOUT];
+	cargs->errfd = (ret_errfd?errfds[FDOUT]:-1);
+	cargs->exec_fn = exec_fn;
+	cargs->exec_data = exec_data;
+
+	ret = tvm_pthread_fork(&pid, &attr, spawn_command_thread, (void *)cargs);
+	if (ret != 0) {
+		close(infds[0]);
+		close(infds[1]);
+		close(outfds[0]);
+		close(outfds[1]);
+		if (ret_errfd) {
+			close(errfds[0]);
+			close(errfds[1]);
+		}
+		m_free(cargs);
+		pthread_attr_destroy(&attr);
+		return DROPBEAR_FAILURE;
+	}
+	pthread_attr_destroy(&attr);
+#else
 #if DROPBEAR_VFORK
 	pid = vfork();
 #else
 	pid = fork();
 #endif
-
 	if (pid < 0) {
 		return DROPBEAR_FAILURE;
 	}
@@ -317,58 +421,53 @@ int spawn_command(void(*exec_fn)(const void *user_data), const void *exec_data,
 			dropbear_exit("signal() error");
 		}
 
-		/* redirect stdin/stdout */
-
-		if ((dup2(infds[FDIN], STDIN_FILENO) < 0) ||
-			(dup2(outfds[FDOUT], STDOUT_FILENO) < 0) ||
-			(ret_errfd && dup2(errfds[FDOUT], STDERR_FILENO) < 0)) {
-			TRACE(("leave noptycommand: error redirecting FDs"))
-			dropbear_exit("Child dup2() failure");
-		}
-
 		close(infds[FDOUT]);
-		close(infds[FDIN]);
 		close(outfds[FDIN]);
-		close(outfds[FDOUT]);
 		if (ret_errfd)
 		{
 			close(errfds[FDIN]);
-			close(errfds[FDOUT]);
 		}
 
-		exec_fn(exec_data);
-		/* not reached */
-		return DROPBEAR_FAILURE;
-	} else {
-		/* parent */
-		close(infds[FDIN]);
-		close(outfds[FDOUT]);
-
-		setnonblocking(outfds[FDIN]);
-		setnonblocking(infds[FDOUT]);
-
-		if (ret_errfd) {
-			close(errfds[FDOUT]);
-			setnonblocking(errfds[FDIN]);
-		}
-
-		if (ret_pid) {
-			*ret_pid = pid;
-		}
-
-		*ret_writefd = infds[FDOUT];
-		*ret_readfd = outfds[FDIN];
-		if (ret_errfd) {
-			*ret_errfd = errfds[FDIN];
-		}
-		return DROPBEAR_SUCCESS;
+		spawn_command_child(
+			infds[FDIN], outfds[FDOUT], (ret_errfd?errfds[FDOUT]:-1),
+			exec_fn, exec_data
+		);
 	}
+#endif
+
+	/* parent */
+#if !DROPBEAR_FORKLESS
+	close(infds[FDIN]);
+	close(outfds[FDOUT]);
+#endif
+
+	setnonblocking(outfds[FDIN]);
+	setnonblocking(infds[FDOUT]);
+
+	if (ret_errfd) {
+#if !DROPBEAR_FORKLESS
+		close(errfds[FDOUT]);
+#endif
+		setnonblocking(errfds[FDIN]);
+	}
+
+	if (ret_pid) {
+		*ret_pid = pid;
+	}
+
+	*ret_writefd = infds[FDOUT];
+	*ret_readfd = outfds[FDIN];
+	if (ret_errfd) {
+		*ret_errfd = errfds[FDIN];
+	}
+	return DROPBEAR_SUCCESS;
 }
 
 /* Runs a command with "sh -c". Will close FDs (except stdin/stdout/stderr) and
  * re-enabled SIGPIPE. If cmd is NULL, will run a login shell.
  */
 void run_shell_command(const char* cmd, unsigned int maxfd, char* usershell) {
+	int argc;
 	char * argv[4];
 	char * baseshell = NULL;
 	unsigned int i;
@@ -388,9 +487,11 @@ void run_shell_command(const char* cmd, unsigned int maxfd, char* usershell) {
 		argv[1] = "-c";
 		argv[2] = (char*)cmd;
 		argv[3] = NULL;
+		argc = 3;
 	} else {
 		/* construct a shell of the form "-bash" etc */
 		argv[1] = NULL;
+		argc = 1;
 	}
 
 	/* Re-enable SIGPIPE for the executed process */
@@ -404,7 +505,11 @@ void run_shell_command(const char* cmd, unsigned int maxfd, char* usershell) {
 		m_close(i);
 	}
 
+#if DROPBEAR_NOEXEC
+	DROPBEAR_NOEXEC_SHELL(argc, argv);
+#else
 	execv(usershell, argv);
+#endif
 }
 
 #if DEBUG_TRACE

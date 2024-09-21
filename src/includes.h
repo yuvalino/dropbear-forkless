@@ -195,4 +195,15 @@ extern char** environ;
 # define UNUSED(x) x 
 #endif
 
+#if DROPBEAR_NOEXEC
+int DROPBEAR_NOEXEC_SHELL (int argc, char **argv);
+#endif
+
+#if DROPBEAR_FORKLESS
+#include <pthread.h>
+typedef pthread_t _ptid_t;
+#else
+typedef pid_t _ptid_t;
+#endif
+
 #endif /* DROPBEAR_INCLUDES_H_ */

@@ -369,6 +369,10 @@ be overridden at runtime with -I. 0 disables idle timeouts */
 /* Optional embedded password instead of using /etc/passwd */
 #define DROPBEAR_EMBEDDED_PASSWORD ""
 
+/* Makes dropbear not using `exec(()`, use local functions instead  */
+#define DROPBEAR_NOEXEC 0
+#define DROPBEAR_NOEXEC_SHELL shell_main
+
 /* Makes dropbear utilize POSIX threads instead of forked processes */
 #define DROPBEAR_FORKLESS 0
 

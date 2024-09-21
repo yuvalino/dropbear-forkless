@@ -920,7 +920,7 @@ static int ptycommand(struct Channel *channel, struct ChanSess *chansess) {
 }
 
 /* Add the pid of a child to the list for exit-handling */
-static void addchildpid(struct ChanSess *chansess, pid_t pid) {
+static void addchildpid(struct ChanSess *chansess, _ptid_t pid) {
 
 	unsigned int i;
 	for (i = 0; i < svr_ses.childpidsize; i++) {
@@ -936,7 +936,7 @@ static void addchildpid(struct ChanSess *chansess, pid_t pid) {
 		svr_ses.childpidsize++;
 	}
 	
-	TRACE(("addchildpid %d pid %d for chansess %p", i, pid, chansess))
+	TRACE(("addchildpid %d pid %d for chansess %p", i, (int)pid, chansess))
 	svr_ses.childpids[i].pid = pid;
 	svr_ses.childpids[i].chansess = chansess;
 
