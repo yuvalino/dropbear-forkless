@@ -31,6 +31,10 @@
 #include "auth.h"
 #include "tcpfwd.h"
 
+#if DROPBEAR_FORKLESS
+#include "tvm.h"
+#endif
+
 typedef struct runopts {
 
 	int disable_ip_tos;
@@ -61,7 +65,11 @@ typedef struct runopts {
 
 } runopts;
 
+#if DROPBEAR_FORKLESS
+COW_DECL(runopts, opts);
+#else
 extern runopts opts;
+#endif
 
 int readhostkey(const char * filename, sign_key * hostkey,
 	enum signkey_type *type);
@@ -141,7 +149,11 @@ typedef struct svr_runopts {
 
 } svr_runopts;
 
+#if DROPBEAR_FORKLESS
+COW_DECL(svr_runopts, svr_opts);
+#else
 extern svr_runopts svr_opts;
+#endif
 
 void svr_getopts(int argc, char ** argv);
 void loadhostkeys(void);

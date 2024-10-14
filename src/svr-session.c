@@ -41,11 +41,18 @@
 #include "runopts.h"
 #include "crypto_desc.h"
 #include "fuzz.h"
+#if DROPBEAR_FORKLESS
+#include "tvm.h"
+#endif
 
 static void svr_remoteclosed(void);
 static void svr_algos_initialise(void);
 
+#if DROPBEAR_FORKLESS
+COW_IMPL(struct serversession, svr_ses); /* GLOBAL */
+#else
 struct serversession svr_ses; /* GLOBAL */
+#endif
 
 static const packettype svr_packettypes[] = {
 	{SSH_MSG_CHANNEL_DATA, recv_msg_channel_data},

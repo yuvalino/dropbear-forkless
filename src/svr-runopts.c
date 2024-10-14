@@ -33,7 +33,12 @@
 
 #include <grp.h>
 
+#if DROPBEAR_FORKLESS
+#include "tvm.h"
+COW_IMPL(svr_runopts, svr_opts); /* GLOBAL */
+#else
 svr_runopts svr_opts; /* GLOBAL */
+#endif
 
 static void printhelp(const char * progname);
 static void addportandaddress(const char* spec);

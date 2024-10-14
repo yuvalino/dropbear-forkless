@@ -43,6 +43,9 @@
 #endif
 #include "gcm.h"
 #include "chachapoly.h"
+#if DROPBEAR_FORKLESS
+#include "tvm.h"
+#endif
 
 void common_session_init(int sock_in, int sock_out);
 void session_loop(void(*loophandler)(void)) ATTRIB_NORETURN;
@@ -339,10 +342,18 @@ struct clientsession {
 };
 
 /* Global structs storing the state */
+#if DROPBEAR_FORKLESS
+COW_DECL(struct sshsession, ses);
+#else
 extern struct sshsession ses;
+#endif
 
 #if DROPBEAR_SERVER
+#if DROPBEAR_FORKLESS
+COW_DECL(struct serversession, svr_ses);
+#else
 extern struct serversession svr_ses;
+#endif
 #endif /* DROPBEAR_SERVER */
 
 #if DROPBEAR_CLIENT

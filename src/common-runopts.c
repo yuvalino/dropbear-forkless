@@ -31,7 +31,11 @@
 #include "algo.h"
 #include "dbrandom.h"
 
+#if DROPBEAR_FORKLESS
+COW_IMPL(runopts, opts); /* GLOBAL */
+#else
 runopts opts; /* GLOBAL */
+#endif
 
 /* returns success or failure, and the keytype in *type. If we want
  * to restrict the type, type can contain a type to return */
