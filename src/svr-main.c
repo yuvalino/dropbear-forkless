@@ -31,6 +31,10 @@
 #include "dbrandom.h"
 #include "crypto_desc.h"
 
+#if DROPBEAR_FORKLESS
+#include "tvm.h"
+#endif
+
 static size_t listensockets(int *sock, size_t sockcount, int *maxfd);
 static void sigchld_handler(int dummy);
 static void sigsegv_handler(int);
@@ -370,7 +374,11 @@ static void main_noinetd(int argc, char ** argv, const char* multipath) {
 						TRACE(("cloexec for childsock %d failed: %s", childsock, strerror(errno)))
 					}
 					/* Re-execute ourself */
+#if DROPBEAR_FORKLESS
+					fexecve(execfd, new_argv, tvm_environ);
+#else
 					fexecve(execfd, new_argv, environ);
+#endif /* DROPBEAR_FORKLESS */
 					/* Not reached on success */
 
 					/* Fall back on plain fork otherwise.

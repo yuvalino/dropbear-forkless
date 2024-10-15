@@ -38,6 +38,10 @@
 #include "runopts.h"
 #include "auth.h"
 
+#if DROPBEAR_FORKLESS
+#include "tvm.h"
+#endif
+
 /* Handles sessions (either shells or programs) requested by the client */
 
 static int sessioncommand(struct Channel *channel, struct ChanSess *chansess,
@@ -973,9 +977,15 @@ static void execchild(const void *user_data) {
 		clearenv();
 #else /* don't HAVE_CLEARENV */
 		/* Yay for posix. */
+#if DROPBEAR_FORKLESS
+		if (tvm_environ) {
+			tvm_environ[0] = NULL;
+		}
+#else
 		if (environ) {
 			environ[0] = NULL;
 		}
+#endif /* DROPBEAR_FORKLESS */
 #endif /* HAVE_CLEARENV */
 #endif /* DEBUG_VALGRIND */
 	}
