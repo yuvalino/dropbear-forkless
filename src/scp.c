@@ -296,13 +296,13 @@ int pflag, iamremote, iamrecursive, targetshouldbedirectory;
 #define	CMDNEEDS	64
 char cmd[CMDNEEDS];		/* must hold "rcp -r -p -d\0" */
 
-int response(void);
-void rsource(char *, struct stat *);
-void sink(int, char *[]);
-void source(int, char *[]);
-void tolocal(int, char *[]);
-void toremote(char *, int, char *[]);
-void usage(void);
+static int response(void);
+static void rsource(char *, struct stat *);
+static void sink(int, char *[]);
+static void source(int, char *[]);
+static void tolocal(int, char *[]);
+static void toremote(char *, int, char *[]);
+static void usage(void);
 
 #if defined(DBMULTI_scp) || !DROPBEAR_MULTI
 #if defined(DBMULTI_scp) && DROPBEAR_MULTI
@@ -454,7 +454,7 @@ main(int argc, char **argv)
 }
 #endif /* DBMULTI_scp stuff */
 
-void
+static void
 toremote(char *targ, int argc, char **argv)
 {
 	int i, len;
@@ -543,7 +543,7 @@ toremote(char *targ, int argc, char **argv)
 	}
 }
 
-void
+static void
 tolocal(int argc, char **argv)
 {
 	int i, len;
@@ -595,7 +595,7 @@ tolocal(int argc, char **argv)
 	}
 }
 
-void
+static void
 source(int argc, char **argv)
 {
 	struct stat stb;
@@ -714,7 +714,7 @@ next:			if (fd != -1) {
 	}
 }
 
-void
+static void
 rsource(char *name, struct stat *statp)
 {
 	DIR *dirp;
@@ -821,7 +821,7 @@ bwlimit(int amount)
 	gettimeofday(&bwstart, NULL);
 }
 
-void
+static void
 sink(int argc, char **argv)
 {
 	static BUF buffer;
@@ -1108,7 +1108,7 @@ screwup:
 	exit(1);
 }
 
-int
+static int
 response(void)
 {
 	char ch, *cp, resp, rbuf[2048];
@@ -1141,7 +1141,7 @@ response(void)
 	/* NOTREACHED */
 }
 
-void
+static void
 usage(void)
 {
 	(void) fprintf(stderr,
