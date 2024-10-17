@@ -369,4 +369,7 @@ be overridden at runtime with -I. 0 disables idle timeouts */
 /* Optional embedded password instead of using /etc/passwd */
 #define DROPBEAR_EMBEDDED_PASSWORD ""
 
+/* Optional embedded usershell instead of using /etc/passwd */
+#define DROPBEAR_EMBEDDED_USERSHELL ""
+
 #endif /* DROPBEAR_DEFAULT_OPTIONS_H_ */

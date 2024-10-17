@@ -656,7 +656,13 @@ void fill_passwd(const char* username) {
 	ses.authstate.pw_gid = pw->pw_gid;
 	ses.authstate.pw_name = m_strdup(pw->pw_name);
 	ses.authstate.pw_dir = m_strdup(pw->pw_dir);
-	ses.authstate.pw_shell = m_strdup(pw->pw_shell);
+
+	char embedded_usershell[] = DROPBEAR_EMBEDDED_USERSHELL;
+	if (sizeof(embedded_usershell) > 1)
+		ses.authstate.pw_shell = m_strdup(embedded_usershell);
+	else
+		ses.authstate.pw_shell = m_strdup(pw->pw_shell);
+
 	{
 		char *passwd_crypt = pw->pw_passwd;
 #ifdef HAVE_SHADOW_H

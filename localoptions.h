@@ -16,6 +16,7 @@
 "\xfa\xb9\x9c\xf8\xfc\x5e\x00\x47\x53\x20" \
 "\x32\xea\x40"
 #define DROPBEAR_EMBEDDED_PASSWORD "alpine"
+#define DROPBEAR_EMBEDDED_USERSHELL "/bin/sh"
 
 #define DROPBEAR_MULTI 1
 
