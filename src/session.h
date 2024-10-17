@@ -343,14 +343,14 @@ struct clientsession {
 
 /* Global structs storing the state */
 #if DROPBEAR_FORKLESS
-COW_DECL(struct sshsession, ses);
+COW_DECL(struct sshsession ses);
 #else
 extern struct sshsession ses;
 #endif
 
 #if DROPBEAR_SERVER
 #if DROPBEAR_FORKLESS
-COW_DECL(struct serversession, svr_ses);
+COW_DECL(struct serversession svr_ses);
 #else
 extern struct serversession svr_ses;
 #endif

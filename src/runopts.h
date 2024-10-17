@@ -66,7 +66,7 @@ typedef struct runopts {
 } runopts;
 
 #if DROPBEAR_FORKLESS
-COW_DECL(runopts, opts);
+COW_DECL(runopts opts);
 #else
 extern runopts opts;
 #endif
@@ -150,7 +150,7 @@ typedef struct svr_runopts {
 } svr_runopts;
 
 #if DROPBEAR_FORKLESS
-COW_DECL(svr_runopts, svr_opts);
+COW_DECL(svr_runopts svr_opts);
 #else
 extern svr_runopts svr_opts;
 #endif
