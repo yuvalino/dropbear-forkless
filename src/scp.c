@@ -81,8 +81,34 @@
 #include "scpmisc.h"
 #include "progressmeter.h"
 
+#if DROPBEAR_FORKLESS
+#include "tvm.h"
+#endif
+
 void bwlimit(int);
 
+#if DROPBEAR_FORKLESS
+/* Struct for addargs */
+static COW_IMPL(arglist, args);
+
+/* Bandwidth limit */
+static COW_IMPL_INIT(off_t, limit_rate, 0);
+
+/* Name of current file being transferred. */
+static COW_IMPL(char *, curfile);
+
+/* This is set to non-zero to enable verbose mode. */
+static COW_IMPL_INIT(int, verbose_mode, 0);
+
+/* This is set to zero if the progressmeter is not desired. */
+static COW_IMPL_INIT(int, showprogress, 1);
+
+/* This is the program to execute for the secured connection. ("ssh" or -S) */
+static COW_IMPL_INIT(char *, ssh_program, DROPBEAR_PATH_SSH_PROGRAM);
+
+/* This is used to store the pid of ssh_program */
+static COW_IMPL_INIT(pid_t, do_cmd_pid, 1);
+#else
 /* Struct for addargs */
 arglist args;
 
@@ -103,6 +129,7 @@ char *ssh_program = DROPBEAR_PATH_SSH_PROGRAM;
 
 /* This is used to store the pid of ssh_program */
 pid_t do_cmd_pid = -1;
+#endif
 
 static void
 killchild(int signo)
@@ -289,12 +316,27 @@ int okname(char *);
 void run_err(const char *,...);
 void verifydir(char *);
 
+#if DROPBEAR_FORKLESS
+static COW_IMPL(uid_t, userid);
+static COW_IMPL(int, errs);
+static COW_IMPL(int, remin);
+static COW_IMPL(int, remout);
+static COW_IMPL(int, pflag);
+static COW_IMPL(int, iamremote);
+static COW_IMPL(int, iamrecursive);
+static COW_IMPL(int, targetshouldbedirectory);
+#else
 uid_t userid;
 int errs, remin, remout;
 int pflag, iamremote, iamrecursive, targetshouldbedirectory;
+#endif
 
 #define	CMDNEEDS	64
+#if DROPBEAR_FORKLESS
+static COW_IMPL_ARRAY(char, cmd, CMDNEEDS);
+#else
 char cmd[CMDNEEDS];		/* must hold "rcp -r -p -d\0" */
+#endif
 
 static int response(void);
 static void rsource(char *, struct stat *);
@@ -324,7 +366,7 @@ main(int argc, char **argv)
 	memset(&args, '\0', sizeof(args));
 	args.list = NULL;
 	addargs(&args, "%s", ssh_program);
-
+	
 	fflag = tflag = 0;
 	while ((ch = getopt(argc, argv, "dfl:prtvBCc:i:P:q1246S:o:F:")) != -1)
 		switch (ch) {
