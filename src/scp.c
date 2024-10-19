@@ -357,8 +357,15 @@ main(int argc, char **argv)
 	int ch, fflag, tflag, status;
 	double speed;
 	char *targ, *endp;
+#if DROPBEAR_FORKLESS
+	char **_optarg = &tvm_optarg;
+	int *_optind = &tvm_optind;
+#else
 	extern char *optarg;
 	extern int optind;
+	char **_optarg = &optarg;
+	int *_optind = &optind;
+#endif
 
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();
@@ -382,16 +389,16 @@ main(int argc, char **argv)
 		case 'c':
 		case 'i':
 		case 'F':
-			addargs(&args, "-%c%s", ch, optarg);
+			addargs(&args, "-%c%s", ch, *_optarg);
 			break;
 		case 'P':
-			addargs(&args, "-p%s", optarg);
+			addargs(&args, "-p%s", *_optarg);
 			break;
 		case 'B':
 			fprintf(stderr, "Note: -B option is disabled in this version of scp");
 			break;
 		case 'l':
-			speed = strtod(optarg, &endp);
+			speed = strtod(*_optarg, &endp);
 			if (speed <= 0 || *endp != '\0')
 				usage();
 			limit_rate = speed * 1024;
@@ -403,7 +410,7 @@ main(int argc, char **argv)
 			iamrecursive = 1;
 			break;
 		case 'S':
-			ssh_program = xstrdup(optarg);
+			ssh_program = xstrdup(*_optarg);
 			break;
 		case 'v':
 			addargs(&args, "-v");
@@ -434,8 +441,8 @@ main(int argc, char **argv)
 		default:
 			usage();
 		}
-	argc -= optind;
-	argv += optind;
+	argc -= (*_optind);
+	argv += (*_optind);
 
 	if (!isatty(STDERR_FILENO))
 		showprogress = 0;
