@@ -333,7 +333,7 @@ int pflag, iamremote, iamrecursive, targetshouldbedirectory;
 
 #define	CMDNEEDS	64
 #if DROPBEAR_FORKLESS
-static COW_IMPL_ARRAY(char, cmd, CMDNEEDS);
+static COW_IMPL(char[CMDNEEDS], cmd);
 #else
 char cmd[CMDNEEDS];		/* must hold "rcp -r -p -d\0" */
 #endif
